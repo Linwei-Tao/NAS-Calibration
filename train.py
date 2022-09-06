@@ -15,6 +15,7 @@ import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
+from utils.evaluation import test_performance
 
 
 parser = argparse.ArgumentParser("cifar")
@@ -43,8 +44,8 @@ parser.add_argument('--scheduler', type=str, default='darts', help='use darts se
 
 args = parser.parse_args()
 
-args.save = 'eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
-utils.create_exp_dir(os.path.join("./output", args.save), scripts_to_save=glob.glob('*.py'))
+args.save = './output/eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -104,9 +105,12 @@ def main():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
 
   for epoch in range(args.epochs):
-    scheduler.step()
-    logging.info('epoch %d lr %e', epoch, scheduler.get_lr()[0])
+
+
+
+    logging.info('epoch %d lr %e', epoch, scheduler.get_last_lr()[0])
     model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
+
 
     train_acc, train_obj = train(train_queue, model, criterion, optimizer)
     logging.info('train_acc %f', train_acc)
@@ -114,6 +118,12 @@ def main():
     valid_acc, valid_obj = infer(valid_queue, model, criterion)
     logging.info('valid_acc %f', valid_acc)
 
+
+    ece, adaece, cece, nll = test_performance(test_queue=valid_queue, model=model)
+    logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
+
+
+    scheduler.step()
     utils.save(model, os.path.join(args.save, 'weights.pt'))
 
 
@@ -134,7 +144,7 @@ def train(train_queue, model, criterion, optimizer):
       loss_aux = criterion(logits_aux, target)
       loss += args.auxiliary_weight*loss_aux
     loss.backward()
-    nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
+    nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
     optimizer.step()
 
     prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
