@@ -106,8 +106,6 @@ def main():
 
   for epoch in range(args.epochs):
 
-
-
     logging.info('epoch %d lr %e', epoch, scheduler.get_last_lr()[0])
     model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 

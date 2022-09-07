@@ -12,10 +12,12 @@ import torch.utils
 import torch.nn.functional as F
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
-
+from utils.evaluation import test_performance
 from torch.autograd import Variable
 from model_search import Network
 from architect import Architect
+
+from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE
 
 parser = argparse.ArgumentParser("cifar")
 parser.add_argument('--data', type=str, default='../data', help='location of the data corpus')
@@ -34,15 +36,22 @@ parser.add_argument('--cutout', action='store_true', default=False, help='use cu
 parser.add_argument('--cutout_length', type=int, default=16, help='cutout length')
 parser.add_argument('--drop_path_prob', type=float, default=0.3, help='drop path probability')
 parser.add_argument('--save', type=str, default='EXP', help='experiment name')
+parser.add_argument('--criterion', type=str, default='ce', help='default cross entropy loss training')
 parser.add_argument('--seed', type=int, default=2, help='random seed')
 parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')
 parser.add_argument('--train_portion', type=float, default=0.5, help='portion of training data')
 parser.add_argument('--unrolled', action='store_true', default=False, help='use one-step unrolled validation loss')
 parser.add_argument('--arch_learning_rate', type=float, default=3e-4, help='learning rate for arch encoding')
 parser.add_argument('--arch_weight_decay', type=float, default=1e-3, help='weight decay for arch encoding')
+parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient of auxiliary loss')
+parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth factor for label smoothing')
 args = parser.parse_args()
 
-args.save = 'search-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+if args.criterion == 'ls':
+    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.smooth_factor, time.strftime("%Y%m%d-%H%M%S"))
+else:
+    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.auxloss_coef, time.strftime("%Y%m%d-%H%M%S"))
+
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
@@ -69,7 +78,15 @@ def main():
     logging.info('gpu device = %d' % args.gpu)
     logging.info("args = %s", args)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion_dict = {
+        'ce': nn.CrossEntropyLoss(),
+        'softece': CrossEntropySoftECE(CIFAR_CLASSES, args.auxloss_coef),
+        'mmce': CrossEntropyMMCE(CIFAR_CLASSES, args.auxloss_coef),
+        'ls': CrossEntropyLabelSmooth(CIFAR_CLASSES, args.smooth_factor),
+        'klece':KLECE(CIFAR_CLASSES, args.auxloss_coef)
+    }
+
+    criterion = criterion_dict[args.criterion]
     criterion = criterion.cuda()
     model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
     model = model.cuda()
@@ -93,7 +110,7 @@ def main():
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
         pin_memory=True, num_workers=2)
 
-    valid_queue = torch.utils.data.DataLoader(
+    test_queue = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True, num_workers=2)
@@ -104,28 +121,30 @@ def main():
     architect = Architect(model, args)
 
     for epoch in range(args.epochs):
-        scheduler.step()
-        lr = scheduler.get_lr()[0]
+
+        lr = scheduler.get_last_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
 
         genotype = model.genotype()
         logging.info('genotype = %s', genotype)
 
-        print(F.softmax(model.alphas_normal, dim=-1))
-        print(F.softmax(model.alphas_reduce, dim=-1))
-
         # training
-        train_acc, train_obj = train(train_queue, valid_queue, model, architect, criterion, optimizer, lr)
+        train_acc, train_obj = train(train_queue, test_queue, model, architect, criterion, optimizer, lr)
         logging.info('train_acc %f', train_acc)
 
         # validation
-        valid_acc, valid_obj = infer(valid_queue, model, criterion)
+        valid_acc, valid_obj = infer(test_queue, model, criterion)
         logging.info('valid_acc %f', valid_acc)
 
+        # test ece
+        ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
+        logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
+
+        scheduler.step()
         utils.save(model, os.path.join(args.save, 'weights.pt'))
 
 
-def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
+def train(train_queue, test_queue, model, architect, criterion, optimizer, lr):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
@@ -138,7 +157,7 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
         target = Variable(target, requires_grad=False).cuda()
 
         # get a random minibatch from the search queue with replacement
-        input_search, target_search = next(iter(valid_queue))
+        input_search, target_search = next(iter(test_queue))
         input_search = Variable(input_search, requires_grad=False).cuda()
         target_search = Variable(target_search, requires_grad=False).cuda()
 
@@ -149,13 +168,13 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
         loss = criterion(logits, target)
 
         loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
         optimizer.step()
 
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
+        objs.update(loss.item(), n)
+        top1.update(prec1.item(), n)
+        top5.update(prec5.item(), n)
 
         if step % args.report_freq == 0:
             logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
@@ -163,13 +182,13 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
     return top1.avg, objs.avg
 
 
-def infer(valid_queue, model, criterion):
+def infer(test_queue, model, criterion):
     objs = utils.AvgrageMeter()
     top1 = utils.AvgrageMeter()
     top5 = utils.AvgrageMeter()
     model.eval()
 
-    for step, (input, target) in enumerate(valid_queue):
+    for step, (input, target) in enumerate(test_queue):
         input = Variable(input, volatile=True).cuda()
         target = Variable(target, volatile=True).cuda()
 
@@ -178,9 +197,9 @@ def infer(valid_queue, model, criterion):
 
         prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
         n = input.size(0)
-        objs.update(loss.data[0], n)
-        top1.update(prec1.data[0], n)
-        top5.update(prec5.data[0], n)
+        objs.update(loss.item(), n)
+        top1.update(prec1.item(), n)
+        top5.update(prec5.item(), n)
 
         if step % args.report_freq == 0:
             logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)

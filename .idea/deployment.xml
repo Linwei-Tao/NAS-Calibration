@@ -15,6 +15,9 @@
           <mappings>
             <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" web="/" />
           </mappings>
+          <excludedPaths>
+            <excludedPath path="/home/linwei/Desktop/projects/NAS-Calibration/output" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>
