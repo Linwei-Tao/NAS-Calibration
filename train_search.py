@@ -56,10 +56,11 @@ utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                    format=log_format, datefmt='%m/%d %I:%M:%S %p')
+    format=log_format, datefmt='%m/%d %I:%M:%S %p')
 fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
+
 
 CIFAR_CLASSES = 10
 
@@ -89,6 +90,8 @@ def main():
     criterion = criterion_dict[args.criterion]
     criterion = criterion.cuda()
     model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
     model = model.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
@@ -126,7 +129,11 @@ def main():
         lr = scheduler.get_last_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
 
-        genotype = model.genotype()
+
+        if type(model) == nn.DataParallel:
+            genotype = model.module.genotype()
+        else:
+            genotype = model.genotype()
         logging.info('genotype = %s', genotype)
 
         # training

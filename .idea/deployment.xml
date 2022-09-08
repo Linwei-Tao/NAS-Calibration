@@ -1,19 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="lab2" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;*.pt" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false" showNewOnTargetInSync="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="Lab2" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;*.pt" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false" showNewOnTargetInSync="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="lab1">
+      <paths name="Lab1">
         <serverdata>
           <mappings>
             <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="lab2">
+      <paths name="Lab2">
         <serverdata>
           <mappings>
             <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="linwei@lab2.taolinwei.com:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
