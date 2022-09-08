@@ -15,4 +15,4 @@ pip install /usr/local/pytorch/cuda10.2/torchvision-0.11.0a0+3a7e5e3-cp37-cp37m-
 
 cd "/project/RDS-FEI-ContraGAN-RW/projects/NAS-Calibration"
 pip install -r requirements.txt
-python train_search.py --diw --epochs=500 --seed=1 --warm_up_population=100 --gumbel_scale=1e-2 --arch_learning$
+python3 train.py --drop_path_prob=0 --weight_decay=5e-4 --epochs=350 --scheduler=focal --batch_size=128 --save=Test_Artemis
