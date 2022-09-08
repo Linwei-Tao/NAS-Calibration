@@ -3,6 +3,13 @@
   <component name="PublishConfigData" autoUpload="Always" serverName="lab2" exclude=".svn;.cvs;.idea;.DS_Store;.git;.hg;*.hprof;*.pyc;*.pt" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false" showNewOnTargetInSync="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
+      <paths name="lab1">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="lab2">
         <serverdata>
           <mappings>
