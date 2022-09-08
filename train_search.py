@@ -122,10 +122,6 @@ def main():
 
     for epoch in range(args.epochs):
 
-        # test ece
-        ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
-        logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
-
 
         lr = scheduler.get_last_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
