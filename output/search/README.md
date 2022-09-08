@@ -1,0 +1,1 @@
+All searched output is stored on computation nodes.
