@@ -13,6 +13,7 @@ def entropy(net_output):
     entropy = - torch.sum(plogp, dim=1)
     return entropy
 
+
 def confidence(net_output):
     p = F.softmax(net_output, dim=1)
     confidence, _ = torch.max(p, dim=1)
@@ -68,9 +69,12 @@ def get_roc_auc(net, test_loader, ood_test_loader, device):
             entropies = torch.cat((entropies, entrop))
             confidences = torch.cat((confidences, conf))
 
-    fpr_entropy, tpr_entropy, thresholds_entropy = metrics.roc_curve(bin_labels_entropies.cpu().numpy(), entropies.cpu().numpy())
-    fpr_confidence, tpr_confidence, thresholds_confidence = metrics.roc_curve(bin_labels_confidences.cpu().numpy(), confidences.cpu().numpy())
+    fpr_entropy, tpr_entropy, thresholds_entropy = metrics.roc_curve(bin_labels_entropies.cpu().numpy(),
+                                                                     entropies.cpu().numpy())
+    fpr_confidence, tpr_confidence, thresholds_confidence = metrics.roc_curve(bin_labels_confidences.cpu().numpy(),
+                                                                              confidences.cpu().numpy())
     auc_entropy = metrics.roc_auc_score(bin_labels_entropies.cpu().numpy(), entropies.cpu().numpy())
     auc_confidence = metrics.roc_auc_score(bin_labels_confidences.cpu().numpy(), confidences.cpu().numpy())
 
-    return (fpr_entropy, tpr_entropy, thresholds_entropy), (fpr_confidence, tpr_confidence, thresholds_confidence), auc_entropy, auc_confidence
+    return (fpr_entropy, tpr_entropy, thresholds_entropy), (
+    fpr_confidence, tpr_confidence, thresholds_confidence), auc_entropy, auc_confidence

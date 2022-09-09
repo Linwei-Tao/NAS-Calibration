@@ -8,6 +8,7 @@ References:
 
 import math
 import matplotlib.pyplot as plt
+
 plt.rcParams.update({'font.size': 20})
 
 # Some keys used for the following dictionaries
@@ -42,7 +43,7 @@ def _populate_bins(confs, preds, labels, num_bins=10):
         bin_dict[binn][COUNT] = bin_dict[binn][COUNT] + 1
         bin_dict[binn][CONF] = bin_dict[binn][CONF] + confidence
         bin_dict[binn][ACC] = bin_dict[binn][ACC] + \
-            (1 if (label == prediction) else 0)
+                              (1 if (label == prediction) else 0)
 
     for binn in range(0, num_bins):
         if (bin_dict[binn][COUNT] == 0):
@@ -52,7 +53,7 @@ def _populate_bins(confs, preds, labels, num_bins=10):
             bin_dict[binn][BIN_ACC] = float(
                 bin_dict[binn][ACC]) / bin_dict[binn][COUNT]
             bin_dict[binn][BIN_CONF] = bin_dict[binn][CONF] / \
-                float(bin_dict[binn][COUNT])
+                                       float(bin_dict[binn][COUNT])
     return bin_dict
 
 
