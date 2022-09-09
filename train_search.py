@@ -48,19 +48,20 @@ parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth fac
 args = parser.parse_args()
 
 if args.criterion == 'ls':
-    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.smooth_factor, time.strftime("%Y%m%d-%H%M%S"))
+    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.smooth_factor,
+                                                     time.strftime("%Y%m%d-%H%M%S"))
 else:
-    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.auxloss_coef, time.strftime("%Y%m%d-%H%M%S"))
+    args.save = './output/search/{}-{}-{}-{}'.format(args.save, args.criterion, args.auxloss_coef,
+                                                     time.strftime("%Y%m%d-%H%M%S"))
 
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-    format=log_format, datefmt='%m/%d %I:%M:%S %p')
+                    format=log_format, datefmt='%m/%d %I:%M:%S %p')
 fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
-
 
 CIFAR_CLASSES = 10
 
@@ -84,7 +85,7 @@ def main():
         'softece': CrossEntropySoftECE(CIFAR_CLASSES, args.auxloss_coef),
         'mmce': CrossEntropyMMCE(CIFAR_CLASSES, args.auxloss_coef),
         'ls': CrossEntropyLabelSmooth(CIFAR_CLASSES, args.smooth_factor),
-        'klece':KLECE(CIFAR_CLASSES, args.auxloss_coef)
+        'klece': KLECE(CIFAR_CLASSES, args.auxloss_coef)
     }
 
     criterion = criterion_dict[args.criterion]
@@ -125,10 +126,8 @@ def main():
 
     for epoch in range(args.epochs):
 
-
         lr = scheduler.get_last_lr()[0]
         logging.info('epoch %d lr %e', epoch, lr)
-
 
         if type(model) == nn.DataParallel:
             genotype = model.module.genotype()

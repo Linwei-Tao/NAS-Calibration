@@ -17,7 +17,6 @@ from torch.autograd import Variable
 from model import NetworkCIFAR as Network
 from utils.evaluation import test_performance
 
-
 parser = argparse.ArgumentParser("cifar")
 parser.add_argument('--data', type=str, default='../data', help='location of the data corpus')
 parser.add_argument('--batch_size', type=int, default=96, help='batch size')
@@ -39,8 +38,9 @@ parser.add_argument('--save', type=str, default='EXP', help='experiment name')
 parser.add_argument('--seed', type=int, default=0, help='random seed')
 parser.add_argument('--arch', type=str, default='DARTS', help='which architecture to use')
 parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')
-parser.add_argument('--scheduler', type=str, default='darts', help='use darts setting, or "focal" using focal setting as https://arxiv.org/abs/2002.09437')
-
+parser.add_argument('--scheduler', type=str, default='darts',
+                    help='use darts setting, or "focal" using focal setting as https://arxiv.org/abs/2002.09437')
+parser.add_argument('--parallel', action='store_true', default=False, help='data parallelism')
 
 args = parser.parse_args()
 
@@ -49,7 +49,7 @@ utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-    format=log_format, datefmt='%m/%d %I:%M:%S %p')
+                    format=log_format, datefmt='%m/%d %I:%M:%S %p')
 fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
@@ -58,130 +58,125 @@ CIFAR_CLASSES = 10
 
 
 def main():
-  if not torch.cuda.is_available():
-    logging.info('no gpu device available')
-    sys.exit(1)
+    if not torch.cuda.is_available():
+        logging.info('no gpu device available')
+        sys.exit(1)
 
-  np.random.seed(args.seed)
-  torch.cuda.set_device(args.gpu)
-  cudnn.benchmark = True
-  torch.manual_seed(args.seed)
-  cudnn.enabled=True
-  torch.cuda.manual_seed(args.seed)
-  logging.info('gpu device = %d' % args.gpu)
-  logging.info("args = %s", args)
+    np.random.seed(args.seed)
+    torch.cuda.set_device(args.gpu)
+    cudnn.benchmark = True
+    torch.manual_seed(args.seed)
+    cudnn.enabled = True
+    torch.cuda.manual_seed(args.seed)
+    logging.info('gpu device = %d' % args.gpu)
+    logging.info("args = %s", args)
 
-  genotype = eval("genotypes.%s" % args.arch)
-  model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
-  model = model.cuda()
+    genotype = eval("genotypes.%s" % args.arch)
+    model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
+    if args.parallel:
+        model = nn.DataParallel(model).cuda()
+    else:
+        model = model.cuda()
 
+    logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
+    criterion = nn.CrossEntropyLoss()
+    criterion = criterion.cuda()
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        args.learning_rate,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay
+    )
 
-  logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    train_transform, test_transform = utils._data_transforms_cifar10(args)
+    train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
+    test_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=test_transform)
 
-  criterion = nn.CrossEntropyLoss()
-  criterion = criterion.cuda()
-  optimizer = torch.optim.SGD(
-      model.parameters(),
-      args.learning_rate,
-      momentum=args.momentum,
-      weight_decay=args.weight_decay
-      )
+    train_queue = torch.utils.data.DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
 
-  train_transform, test_transform = utils._data_transforms_cifar10(args)
-  train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
-  test_data = dset.CIFAR10(root=args.data, train=False, download=True, transform=test_transform)
+    test_queue = torch.utils.data.DataLoader(
+        test_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
 
-  train_queue = torch.utils.data.DataLoader(
-      train_data, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+    if args.scheduler == "focal":
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1)
+    else:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
 
-  test_queue = torch.utils.data.DataLoader(
-      test_data, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=2)
+    for epoch in range(args.epochs):
+        logging.info('epoch %d lr %e', epoch, scheduler.get_last_lr()[0])
+        model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 
+        train_acc, train_obj = train(train_queue, model, criterion, optimizer)
+        logging.info('train_acc %f', train_acc)
 
-  if args.scheduler == "focal":
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1)
-  else:
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
+        test_acc, test_obj = infer(test_queue, model, criterion)
+        logging.info('test_acc %f', test_acc)
 
-  for epoch in range(args.epochs):
+        ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
+        logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
 
-    logging.info('epoch %d lr %e', epoch, scheduler.get_last_lr()[0])
-    model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
-
-
-    train_acc, train_obj = train(train_queue, model, criterion, optimizer)
-    logging.info('train_acc %f', train_acc)
-
-    test_acc, test_obj = infer(test_queue, model, criterion)
-    logging.info('test_acc %f', test_acc)
-
-
-    ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
-    logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
-
-
-    scheduler.step()
-    utils.save(model, os.path.join(args.save, 'weights.pt'))
+        scheduler.step()
+        utils.save(model, os.path.join(args.save, 'weights.pt'))
 
 
 def train(train_queue, model, criterion, optimizer):
-  objs = utils.AvgrageMeter()
-  top1 = utils.AvgrageMeter()
-  top5 = utils.AvgrageMeter()
-  model.train()
+    objs = utils.AvgrageMeter()
+    top1 = utils.AvgrageMeter()
+    top5 = utils.AvgrageMeter()
+    model.train()
 
-  for step, (input, target) in enumerate(train_queue):
-    input = Variable(input).cuda()
-    target = Variable(target).cuda()
+    for step, (input, target) in enumerate(train_queue):
+        input = Variable(input).cuda()
+        target = Variable(target).cuda()
 
-    optimizer.zero_grad()
-    logits, logits_aux = model(input)
-    loss = criterion(logits, target)
-    if args.auxiliary:
-      loss_aux = criterion(logits_aux, target)
-      loss += args.auxiliary_weight*loss_aux
-    loss.backward()
-    nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-    optimizer.step()
+        optimizer.zero_grad()
+        logits, logits_aux = model(input)
+        loss = criterion(logits, target)
+        if args.auxiliary:
+            loss_aux = criterion(logits_aux, target)
+            loss += args.auxiliary_weight * loss_aux
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+        optimizer.step()
 
-    prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-    n = input.size(0)
-    objs.update(loss.item(), n)
-    top1.update(prec1.item(), n)
-    top5.update(prec5.item(), n)
+        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+        n = input.size(0)
+        objs.update(loss.item(), n)
+        top1.update(prec1.item(), n)
+        top5.update(prec5.item(), n)
 
-    if step % args.report_freq == 0:
-      logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+        if step % args.report_freq == 0:
+            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
-  return top1.avg, objs.avg
+    return top1.avg, objs.avg
 
 
 def infer(test_queue, model, criterion):
-  objs = utils.AvgrageMeter()
-  top1 = utils.AvgrageMeter()
-  top5 = utils.AvgrageMeter()
-  model.eval()
+    objs = utils.AvgrageMeter()
+    top1 = utils.AvgrageMeter()
+    top5 = utils.AvgrageMeter()
+    model.eval()
 
-  for step, (input, target) in enumerate(test_queue):
-    input = Variable(input, volatile=True).cuda()
-    target = Variable(target, volatile=True).cuda()
+    for step, (input, target) in enumerate(test_queue):
+        input = Variable(input, volatile=True).cuda()
+        target = Variable(target, volatile=True).cuda()
 
-    logits, _ = model(input)
-    loss = criterion(logits, target)
+        logits, _ = model(input)
+        loss = criterion(logits, target)
 
-    prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-    n = input.size(0)
-    objs.update(loss.item(), n)
-    top1.update(prec1.item(), n)
-    top5.update(prec5.item(), n)
+        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+        n = input.size(0)
+        objs.update(loss.item(), n)
+        top1.update(prec1.item(), n)
+        top5.update(prec5.item(), n)
 
-    if step % args.report_freq == 0:
-      logging.info('test %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+        if step % args.report_freq == 0:
+            logging.info('test %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
-  return top1.avg, objs.avg
+    return top1.avg, objs.avg
 
 
 if __name__ == '__main__':
-  main() 
-
+    main()
