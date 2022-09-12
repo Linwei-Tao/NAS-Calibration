@@ -12,6 +12,8 @@ import genotypes
 import torch.utils
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
+from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE
+
 
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
@@ -80,7 +82,15 @@ def main():
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
-    criterion = nn.CrossEntropyLoss()
+    criterion_dict = {
+        'ce': nn.CrossEntropyLoss(),
+        'softece': CrossEntropySoftECE(CIFAR_CLASSES, args.auxloss_coef),
+        'mmce': CrossEntropyMMCE(CIFAR_CLASSES, args.auxloss_coef),
+        'ls': CrossEntropyLabelSmooth(CIFAR_CLASSES, args.smooth_factor),
+        'klece': KLECE(CIFAR_CLASSES, args.auxloss_coef)
+    }
+
+    criterion = criterion_dict[args.criterion]
     criterion = criterion.cuda()
     optimizer = torch.optim.SGD(
         model.parameters(),

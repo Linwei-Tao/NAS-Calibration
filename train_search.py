@@ -72,6 +72,7 @@ def main():
         sys.exit(1)
 
     np.random.seed(args.seed)
+
     torch.cuda.set_device(args.gpu)
     cudnn.benchmark = True
     torch.manual_seed(args.seed)
@@ -91,8 +92,8 @@ def main():
     criterion = criterion_dict[args.criterion]
     criterion = criterion.cuda()
     model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
+    # if torch.cuda.device_count() > 1:
+    #     model = nn.DataParallel(model)
     model = model.cuda()
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
@@ -157,16 +158,19 @@ def train(train_queue, test_queue, model, architect, criterion, optimizer, lr):
     top5 = utils.AvgrageMeter()
 
     for step, (input, target) in enumerate(train_queue):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         model.train()
         n = input.size(0)
 
-        input = Variable(input, requires_grad=False).cuda()
-        target = Variable(target, requires_grad=False).cuda()
+        model.to(device)
+        input = Variable(input, requires_grad=False).to(device)
+        target = Variable(target, requires_grad=False).to(device)
 
         # get a random minibatch from the search queue with replacement
         input_search, target_search = next(iter(test_queue))
-        input_search = Variable(input_search, requires_grad=False).cuda()
-        target_search = Variable(target_search, requires_grad=False).cuda()
+        input_search = Variable(input_search, requires_grad=False).to(device)
+        target_search = Variable(target_search, requires_grad=False).to(device)
 
         architect.step(input, target, input_search, target_search, lr, optimizer, unrolled=args.unrolled)
 

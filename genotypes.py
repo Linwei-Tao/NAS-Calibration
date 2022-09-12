@@ -106,4 +106,86 @@ DARTS_SOFTECE = Genotype(
     reduce=[('avg_pool_3x3', 0), ('avg_pool_3x3', 1), ('avg_pool_3x3', 0), ('skip_connect', 2), ('avg_pool_3x3', 0),
             ('skip_connect', 2), ('avg_pool_3x3', 0), ('skip_connect', 2)], reduce_concat=[2, 3, 4, 5])
 
+GDAS_SOFTECE = Genotype(normal=[(('dua_sepc_5x5', 0, 0.13935293), ('dil_sepc_3x3', 0, 0.1353711)),
+                                (('avg_pool_3x3', 1, 0.13698004), ('dua_sepc_5x5', 0, 0.13676478)),
+                                (('max_pool_3x3', 1, 0.13876532), ('dil_sepc_5x5', 0, 0.13539125)),
+                                (('dua_sepc_5x5', 0, 0.136052), ('max_pool_3x3', 1, 0.13484164))],
+                        normal_concat=[2, 3, 4, 5],
+                        reduce=[(('dua_sepc_5x5', 0, 0.14253472), ('dua_sepc_3x3', 0, 0.13481626)),
+                                (('dua_sepc_5x5', 0, 0.14052576), ('dua_sepc_5x5', 1, 0.13620308)),
+                                (('dua_sepc_5x5', 0, 0.14266235), ('dua_sepc_5x5', 3, 0.13773535)),
+                                (('dil_sepc_5x5', 4, 0.13912429), ('dua_sepc_5x5', 4, 0.13413419))],
+                        reduce_concat=[2, 3, 4, 5])
+
+GDAS_MMCE = Genotype(normal=[(('dua_sepc_5x5', 0, 0.1446704), ('dua_sepc_3x3', 0, 0.1349017)),
+                             (('dua_sepc_5x5', 0, 0.14215869), ('skip_connect', 1, 0.13880098)),
+                             (('max_pool_3x3', 1, 0.13670917), ('dua_sepc_5x5', 0, 0.13628487)),
+                             (('dua_sepc_3x3', 0, 0.13854906), ('max_pool_3x3', 1, 0.13547495))],
+                     normal_concat=[2, 3, 4, 5], reduce=[(('dua_sepc_5x5', 0, 0.1469922),
+                                                          ('dua_sepc_5x5', 1, 0.1369147)),
+                                                         (('dua_sepc_5x5', 0, 0.1392603),
+                                                          ('dua_sepc_5x5', 1, 0.1379916)),
+                                                         (('dua_sepc_5x5', 0, 0.14164907),
+                                                          ('dua_sepc_5x5', 1, 0.13332875)), (
+                                                             ('dua_sepc_5x5', 0, 0.1353272),
+                                                             ('dil_sepc_5x5', 4, 0.13477328))],
+                     reduce_concat=[2, 3, 4, 5])
+
+GDAS_LS = Genotype(normal=[(('dua_sepc_5x5', 0, 0.13950792), ('dua_sepc_3x3', 0, 0.13808441)),
+                           (('dil_sepc_5x5', 0, 0.137864), ('dua_sepc_3x3', 0, 0.1321377)),
+                           (('dua_sepc_5x5', 0, 0.14195037), ('dua_sepc_5x5', 3, 0.1354566)),
+                           (('dua_sepc_3x3', 0, 0.13777575), ('dua_sepc_5x5', 4, 0.13760377))],
+                   normal_concat=[2, 3, 4, 5], reduce=[(('dua_sepc_5x5', 0, 0.14439456),
+                                                        ('dua_sepc_3x3', 0, 0.13252382)),
+                                                       (('dua_sepc_5x5', 0, 0.13977385),
+                                                        ('dua_sepc_5x5', 1, 0.13380237)),
+                                                       (('dua_sepc_5x5', 0, 0.13730447),
+                                                        ('dua_sepc_5x5', 1, 0.13456285)),
+                                                       (
+                                                           ('dua_sepc_5x5', 0, 0.13843901),
+                                                           ('dua_sepc_5x5', 4, 0.13410614))],
+                   reduce_concat=[2, 3, 4, 5])
+
+GDAS = Genotype(normal=[(('dil_sepc_5x5', 1, 0.13558622), ('dua_sepc_3x3', 0, 0.13448693)),
+                        (('dua_sepc_3x3', 1, 0.13602218), ('dua_sepc_5x5', 0, 0.13546327)),
+                        (('dua_sepc_5x5', 1, 0.13420552), ('dil_sepc_3x3', 1, 0.13281627)),
+                        (('dua_sepc_3x3', 4, 0.13318287), ('max_pool_3x3', 1, 0.13282226))], normal_concat=[2, 3, 4, 5],
+                reduce=[(
+                    (
+                        'dua_sepc_5x5',
+                        0,
+                        0.14777242),
+                    (
+                        'avg_pool_3x3',
+                        0,
+                        0.13044943)),
+                    (
+                        (
+                            'dua_sepc_5x5',
+                            2,
+                            0.14057024),
+                        (
+                            'dua_sepc_5x5',
+                            0,
+                            0.138111)),
+                    (
+                        (
+                            'dua_sepc_5x5',
+                            0,
+                            0.13946615),
+                        (
+                            'dua_sepc_5x5',
+                            3,
+                            0.1386163)),
+                    (
+                        (
+                            'dua_sepc_5x5',
+                            0,
+                            0.14109468),
+                        (
+                            'dua_sepc_5x5',
+                            2,
+                            0.13702048))], reduce_concat=[
+        2, 3, 4, 5])
+
 DARTS = DARTS_V2

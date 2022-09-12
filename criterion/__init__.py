@@ -40,7 +40,8 @@ class CrossEntropySoftECE(nn.Module):
                                               soft_binning_use_decay=False,
                                               soft_binning_decay_factor=None,
                                               soft_binning_temp=1.1)
-        loss = torch.nn.functional.cross_entropy(inputs, targets) + self.lambda_softece * softece
+        ce_loss = torch.nn.functional.cross_entropy(inputs, targets)
+        loss = ce_loss + self.lambda_softece * softece
         return loss
 
 
