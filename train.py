@@ -45,6 +45,7 @@ parser.add_argument('--scheduler', type=str, default='darts',
 parser.add_argument('--parallel', action='store_true', default=False, help='data parallelism')
 parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient of auxiliary loss')
 parser.add_argument('--criterion', type=str, default='ce', help='default cross entropy loss training')
+parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth factor for label smoothing')
 
 
 args = parser.parse_args()
