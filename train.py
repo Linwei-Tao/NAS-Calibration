@@ -67,10 +67,9 @@ CIFAR_CLASSES = 10
 
 
 def main():
-    wandb.config = {
-        "criterion": args.criterion,
-        "auxloss_coef": args.auxloss_coef,
-    }
+    wandb.config.criterion = args.criterion
+    wandb.config.auxloss_coef = args.auxloss_coef
+
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
@@ -92,6 +91,7 @@ def main():
         model = model.cuda()
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    wandb.watch(model)
 
     criterion_dict = {
         'ce': nn.CrossEntropyLoss(),
@@ -154,28 +154,27 @@ def train(train_queue, model, criterion, optimizer):
     model.train()
 
     for step, (input, target) in enumerate(train_queue):
-        with torch.no_grad():
-            input = input.cuda()
-            target = target.cuda()
+        input = input.cuda()
+        target = target.cuda()
 
-            optimizer.zero_grad()
-            logits, logits_aux = model(input)
-            loss = criterion(logits, target)
-            if args.auxiliary:
-                loss_aux = criterion(logits_aux, target)
-                loss += args.auxiliary_weight * loss_aux
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-            optimizer.step()
+        optimizer.zero_grad()
+        logits, logits_aux = model(input)
+        loss = criterion(logits, target)
+        if args.auxiliary:
+            loss_aux = criterion(logits_aux, target)
+            loss += args.auxiliary_weight * loss_aux
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+        optimizer.step()
 
-            prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-            n = input.size(0)
-            objs.update(loss.item(), n)
-            top1.update(prec1.item(), n)
-            top5.update(prec5.item(), n)
+        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+        n = input.size(0)
+        objs.update(loss.item(), n)
+        top1.update(prec1.item(), n)
+        top5.update(prec5.item(), n)
 
-            if step % args.report_freq == 0:
-                logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+        if step % args.report_freq == 0:
+            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg
 
