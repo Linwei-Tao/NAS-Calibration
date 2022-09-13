@@ -15,9 +15,6 @@ import torch.backends.cudnn as cudnn
 from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE
 import wandb
 
-wandb.init(project="NAS Calibration", entity="linweitao")
-
-
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
 from utils.evaluation import test_performance
@@ -50,7 +47,6 @@ parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient o
 parser.add_argument('--criterion', type=str, default='ce', help='default cross entropy loss training')
 parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth factor for label smoothing')
 
-
 args = parser.parse_args()
 
 args.save = './output/eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -65,11 +61,12 @@ logging.getLogger().addHandler(fh)
 
 CIFAR_CLASSES = 10
 
+config = args
+
+wandb.init(project="NAS Calibration", entity="linweitao", config=config)
+
 
 def main():
-    wandb.config.criterion = args.criterion
-    wandb.config.auxloss_coef = args.auxloss_coef
-
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
@@ -137,11 +134,9 @@ def main():
         logging.info('test_acc %f', test_acc)
         wandb.log({"test_acc": test_acc})
 
-
         ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
         logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
         wandb.log({"ece": ece})
-
 
         scheduler.step()
         utils.save(model, os.path.join(args.save, 'weights.pt'))
