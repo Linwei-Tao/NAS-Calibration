@@ -13,6 +13,7 @@ source ~/pytorch/bin/activate
 pip install /usr/local/pytorch/cuda10.2/torch-1.10.1-cp37-cp37m-linux_x86_64.whl
 pip install /usr/local/pytorch/cuda10.2/torchvision-0.11.0a0+3a7e5e3-cp37-cp37m-linux_x86_64.whl
 
+
 cd "/scratch/ContraGAN/projects/NAS-Calibration"
 pip install -r requirements.txt
-python3 train.py --drop_path_prob=0 --weight_decay=5e-4 --epochs=350 --scheduler=focal --batch_size=128 --save=retrain_softece --arch=DARTS_SOFTECE001 --save=retrain --criterion=softece
+python3.7 train.py --drop_path_prob=0 --weight_decay=5e-4 --epochs=350 --scheduler=focal --batch_size=128 --save=retrain_softece --arch=DARTS_SOFTECE001 --save=retrain --criterion=softece

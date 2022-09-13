@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="100a50d5-4684-4533-a80c-e55faf3adbcf" name="Artemis">
+        <fileTransfer accessType="SFTP" host="hpc.sydney.edu.au" port="22" sshConfigId="63f8294d-2c16-4c5a-86f3-c6e90d27c96d" sshConfig="ltao0358@hpc.sydney.edu.au:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
