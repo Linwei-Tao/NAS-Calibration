@@ -164,31 +164,32 @@ def train(train_queue, test_queue, model, architect, criterion, optimizer, lr):
         n = input.size(0)
 
         model.to(device)
-        input = Variable(input, requires_grad=False).to(device)
-        target = Variable(target, requires_grad=False).to(device)
+        with torch.no_grad():
+            input = input.cuda()
+            target = target.cuda()
 
-        # get a random minibatch from the search queue with replacement
-        input_search, target_search = next(iter(test_queue))
-        input_search = Variable(input_search, requires_grad=False).to(device)
-        target_search = Variable(target_search, requires_grad=False).to(device)
+            # get a random minibatch from the search queue with replacement
+            input_search, target_search = next(iter(test_queue))
+            input_search = Variable(input_search, requires_grad=False).to(device)
+            target_search = Variable(target_search, requires_grad=False).to(device)
 
-        architect.step(input, target, input_search, target_search, lr, optimizer, unrolled=args.unrolled)
+            architect.step(input, target, input_search, target_search, lr, optimizer, unrolled=args.unrolled)
 
-        optimizer.zero_grad()
-        logits = model(input)
-        loss = criterion(logits, target)
+            optimizer.zero_grad()
+            logits = model(input)
+            loss = criterion(logits, target)
 
-        loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-        optimizer.step()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+            optimizer.step()
 
-        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        objs.update(loss.item(), n)
-        top1.update(prec1.item(), n)
-        top5.update(prec5.item(), n)
+            prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
+            objs.update(loss.item(), n)
+            top1.update(prec1.item(), n)
+            top5.update(prec5.item(), n)
 
-        if step % args.report_freq == 0:
-            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+            if step % args.report_freq == 0:
+                logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, objs.avg
 
