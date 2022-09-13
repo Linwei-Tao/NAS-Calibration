@@ -43,6 +43,8 @@ parser.add_argument('--grad_clip', type=float, default=5, help='gradient clippin
 parser.add_argument('--scheduler', type=str, default='darts',
                     help='use darts setting, or "focal" using focal setting as https://arxiv.org/abs/2002.09437')
 parser.add_argument('--parallel', action='store_true', default=False, help='data parallelism')
+parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient of auxiliary loss')
+
 
 args = parser.parse_args()
 
