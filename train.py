@@ -1,3 +1,5 @@
+import wandb
+import socket
 import os
 import sys
 import time
@@ -13,7 +15,6 @@ import torch.utils
 import torchvision.datasets as dset
 import torch.backends.cudnn as cudnn
 from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE
-import wandb
 
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
@@ -49,7 +50,7 @@ parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth fac
 
 args = parser.parse_args()
 
-args.save = './output/eval-{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
+args.save = './output/retrain-{}-{}-{}'.format(args.arch, args.criterion, args.args.save, time.strftime("%Y%m%d-%H%M%S"))
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
@@ -62,11 +63,14 @@ logging.getLogger().addHandler(fh)
 CIFAR_CLASSES = 10
 
 config = args
+config.hostname = socket.gethostname()
+config.name = "retrain"
 
 wandb.init(project="NAS Calibration", entity="linweitao", config=config)
 
 
 def main():
+
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
@@ -128,15 +132,18 @@ def main():
 
         train_acc, train_obj = train(train_queue, model, criterion, optimizer)
         logging.info('train_acc %f', train_acc)
-        wandb.log({"train_acc": train_acc})
 
         test_acc, test_obj = infer(test_queue, model, criterion)
         logging.info('test_acc %f', test_acc)
-        wandb.log({"test_acc": test_acc})
 
         ece, adaece, cece, nll = test_performance(test_queue=test_queue, model=model)
         logging.info('ece %f, adaece %f, cece %f, nll %f', ece, adaece, cece, nll)
-        wandb.log({"ece": ece})
+        wandb.log({
+            "current epoch": epoch,
+            "train_acc": train_acc,
+            "test_acc": test_acc,
+            "ece": ece
+        })
 
         scheduler.step()
         utils.save(model, os.path.join(args.save, 'weights.pt'))
