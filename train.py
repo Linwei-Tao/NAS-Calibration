@@ -13,8 +13,9 @@ import torch.nn as nn
 import genotypes
 import torch.utils
 import torchvision.datasets as dset
+from torchvision.models import resnet18, mobilenet_v2
 import torch.backends.cudnn as cudnn
-from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE
+from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE, FocalLoss
 
 from torch.autograd import Variable
 from model import NetworkCIFAR as Network
@@ -47,10 +48,11 @@ parser.add_argument('--parallel', action='store_true', default=False, help='data
 parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient of auxiliary loss')
 parser.add_argument('--criterion', type=str, default='ce', help='default cross entropy loss training')
 parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth factor for label smoothing')
+parser.add_argument('--focal_gamma', type=float, default=0.5, help='factor for focal loss')
 
 args = parser.parse_args()
 
-args.save = './output/retrain-{}-{}-{}'.format(args.arch, args.criterion, args.args.save, time.strftime("%Y%m%d-%H%M%S"))
+args.save = './output/retrain-{}-{}-{}'.format(args.arch, args.criterion, args.save, time.strftime("%Y%m%d-%H%M%S"))
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
@@ -83,9 +85,11 @@ def main():
     torch.cuda.manual_seed(args.seed)
     logging.info('gpu device = %d' % args.gpu)
     logging.info("args = %s", args)
-
-    genotype = eval("genotypes.%s" % args.arch)
-    model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
+    if args.arch in ['mobilenet_v2']:
+        model = mobilenet_v2(num_classes=CIFAR_CLASSES)
+    else:
+        genotype = eval("genotypes.%s" % args.arch)
+        model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
     if args.parallel:
         model = nn.DataParallel(model).cuda()
     else:
@@ -99,7 +103,8 @@ def main():
         'softece': CrossEntropySoftECE(CIFAR_CLASSES, args.auxloss_coef),
         'mmce': CrossEntropyMMCE(CIFAR_CLASSES, args.auxloss_coef),
         'ls': CrossEntropyLabelSmooth(CIFAR_CLASSES, args.smooth_factor),
-        'klece': KLECE(CIFAR_CLASSES, args.auxloss_coef)
+        'klece': KLECE(CIFAR_CLASSES, args.auxloss_coef),
+        'focal': FocalLoss(args.focal_gamma)
     }
 
     criterion = criterion_dict[args.criterion]
