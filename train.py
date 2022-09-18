@@ -13,7 +13,14 @@ import torch.nn as nn
 import genotypes
 import torch.utils
 import torchvision.datasets as dset
-from torchvision.models import resnet18, mobilenet_v2
+from torchvision.models import alexnet, vgg11, vgg11_bn, vgg13, vgg13_bn, vgg16, vgg16_bn, vgg19, vgg19_bn, resnet18, \
+    resnet34, resnet50 as resnet50_pytorch, resnet101, resnet152, wide_resnet101_2, wide_resnet50_2, resnext50_32x4d, resnext101_32x8d, \
+    densenet121, densenet161, densenet169, densenet201, squeezenet1_0, squeezenet1_1, mnasnet0_5, mnasnet0_75, \
+    mnasnet1_0, mnasnet1_3, mobilenet_v2, shufflenet_v2_x0_5, shufflenet_v2_x1_0, shufflenet_v2_x1_5, \
+    shufflenet_v2_x2_0, inception_v3
+
+from genotypes import resnet50
+
 import torch.backends.cudnn as cudnn
 from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE, FocalLoss
 
@@ -48,11 +55,15 @@ parser.add_argument('--parallel', action='store_true', default=False, help='data
 parser.add_argument('--auxloss_coef', type=float, default=1, help='coefficient of auxiliary loss')
 parser.add_argument('--criterion', type=str, default='ce', help='default cross entropy loss training')
 parser.add_argument('--smooth_factor', type=float, default=0.5, help='smooth factor for label smoothing')
-parser.add_argument('--focal_gamma', type=float, default=0.5, help='factor for focal loss')
+parser.add_argument('--focal_gamma', type=float, default=3.0, help='factor for focal loss')
 
 args = parser.parse_args()
-
-args.save = './output/retrain-{}-{}-{}'.format(args.arch, args.criterion, args.save, time.strftime("%Y%m%d-%H%M%S"))
+if args.criterion == 'focal':
+    args.save = './output/retrain-{}-{}-{}-{}'.format(args.arch, args.criterion, args.focal_gamma,
+                                                      time.strftime("%Y%m%d-%H%M%S"))
+else:
+    args.save = './output/retrain-{}-{}-{}-{}'.format(args.arch, args.criterion, args.auxloss_coef,
+                                                      time.strftime("%Y%m%d-%H%M%S"))
 utils.create_exp_dir(args.save, scripts_to_save=glob.glob('*.py'))
 
 log_format = '%(asctime)s %(message)s'
@@ -68,11 +79,24 @@ config = args
 config.hostname = socket.gethostname()
 config.name = "retrain"
 
+model_list = {
+    'alexnet': alexnet, 'vgg11': vgg11, 'vgg11_bn': vgg11_bn, 'vgg13': vgg13, 'vgg13_bn': vgg13_bn, 'vgg16': vgg16,
+    'vgg16_bn': vgg16_bn, 'vgg19': vgg19, 'vgg19_bn': vgg19_bn,
+    'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50, 'resnet50_pytorch': resnet50_pytorch, 'resnet101': resnet101, 'resnet152': resnet152,
+    'wide_resnet101_2': wide_resnet101_2,
+    'wide_resnet50_2': wide_resnet50_2, 'resnext50_32x4d': resnext50_32x4d,
+    'resnext101_32x8d': resnext101_32x8d, 'densenet121': densenet121, 'densenet161': densenet161,
+    'densenet169': densenet169, 'densenet201': densenet201, 'squeezenet1_0': squeezenet1_0,
+    'squeezenet1_1': squeezenet1_1, 'mnasnet0_5': mnasnet0_5, 'mnasnet0_75': mnasnet0_75,
+    'mnasnet1_0': mnasnet1_0, 'mnasnet1_3': mnasnet1_3, 'mobilenet_v2': mobilenet_v2,
+    'shufflenet_v2_x0_5': shufflenet_v2_x0_5, 'shufflenet_v2_x1_0': shufflenet_v2_x1_0,
+    'shufflenet_v2_x1_5': shufflenet_v2_x1_5, 'shufflenet_v2_x2_0': shufflenet_v2_x2_0, 'inception_v3': inception_v3
+}
+
 wandb.init(project="NAS Calibration", entity="linweitao", config=config)
 
 
 def main():
-
     if not torch.cuda.is_available():
         logging.info('no gpu device available')
         sys.exit(1)
@@ -85,9 +109,19 @@ def main():
     torch.cuda.manual_seed(args.seed)
     logging.info('gpu device = %d' % args.gpu)
     logging.info("args = %s", args)
-    if args.arch in ['mobilenet_v2']:
-        model = mobilenet_v2(num_classes=CIFAR_CLASSES)
+    if args.arch in ['alexnet', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn',
+                     'resnet18', 'resnet34', 'resnet50', 'resnet50_pytorch', 'resnet101', 'resnet152', 'wide_resnet101_2',
+                     'wide_resnet50_2', 'resnext50_32x4d', 'resnext101_32x8d', 'densenet121', 'densenet161',
+                     'densenet169', 'densenet201', 'squeezenet1_0', 'squeezenet1_1', 'mnasnet0_5', 'mnasnet0_75',
+                     'mnasnet1_0', 'mnasnet1_3', 'mobilenet_v2', 'shufflenet_v2_x0_5', 'shufflenet_v2_x1_0',
+                     'shufflenet_v2_x1_5', 'shufflenet_v2_x2_0', 'inception_v3']:
+
+        model = model_list[args.arch](num_classes=CIFAR_CLASSES)
+        args.is_searched_arch = False
+        wandb.config.is_searched_arch = False
     else:
+        args.is_searched_arch = True
+        wandb.config.is_searched_arch = True
         genotype = eval("genotypes.%s" % args.arch)
         model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
     if args.parallel:
@@ -96,6 +130,7 @@ def main():
         model = model.cuda()
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+    wandb.config.model_size = utils.count_parameters_in_MB(model)
     wandb.watch(model)
 
     criterion_dict = {
@@ -165,7 +200,11 @@ def train(train_queue, model, criterion, optimizer):
         target = target.cuda()
 
         optimizer.zero_grad()
-        logits, logits_aux = model(input)
+        if args.is_searched_arch:
+            logits, logits_aux = model(input)
+        else:
+            logits = model(input)
+
         loss = criterion(logits, target)
         if args.auxiliary:
             loss_aux = criterion(logits_aux, target)
@@ -197,7 +236,10 @@ def infer(test_queue, model, criterion):
             input = input.cuda()
             target = target.cuda()
 
-            logits, _ = model(input)
+            if args.auxiliary and args.is_searched_arch:
+                logits, logits_aux = model(input)
+            else:
+                logits = model(input)
             loss = criterion(logits, target)
 
             prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))

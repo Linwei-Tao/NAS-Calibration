@@ -24,13 +24,6 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="linwei@lab2.taolinwei.com:22 password">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/linwei/Desktop/projects/NAS-Calibration" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
     </serverData>
     <option name="myAutoUpload" value="ALWAYS" />
   </component>
