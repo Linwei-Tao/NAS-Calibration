@@ -13,18 +13,20 @@ import torch.nn as nn
 import genotypes
 import torch.utils
 import torchvision.datasets as dset
-from torchvision.models import alexnet, vgg11, vgg11_bn, vgg13, vgg13_bn, vgg16, vgg16_bn, vgg19, vgg19_bn, resnet18, \
-    resnet34, resnet50 as resnet50_pytorch, resnet101, resnet152, wide_resnet101_2, wide_resnet50_2, resnext50_32x4d, resnext101_32x8d, \
-    densenet121, densenet161, densenet169, densenet201, squeezenet1_0, squeezenet1_1, mnasnet0_5, mnasnet0_75, \
-    mnasnet1_0, mnasnet1_3, mobilenet_v2, shufflenet_v2_x0_5, shufflenet_v2_x1_0, shufflenet_v2_x1_5, \
-    shufflenet_v2_x2_0, inception_v3
 
-from genotypes import resnet50
+from models import ResNet18 as ResNet18_CIFAR10, ResNet34 as ResNet34_CIFAR10, ResNet50 as ResNet50_CIFAR10, \
+    ResNet101 as ResNet101_CIFAR10, ResNet152 as ResNet152_CIFAR10
+from models import ShuffleNetV2 as ShuffleNetV2_CIFAR10
+from models import MobileNet as MobileNet_CIFAR10, MobileNetV2 as MobileNetV2_CIFAR10
+from models import EfficientNet as EfficientNet_CIFAR10
+from models import ResNeXt29_2x64d as ResNeXt29_2x64d_CIFAR10, ResNeXt29_4x64d as ResNeXt29_4x64d_CIFAR10, \
+    ResNeXt29_8x64d as ResNeXt29_8x64d_CIFAR10, ResNeXt29_32x4d as ResNeXt29_32x4d_CIFAR10
+from models import VGG11 as VGG11_CIFAR10, VGG13 as VGG13_CIFAR10, VGG16 as VGG16_CIFAR10, VGG19 as VGG19_CIFAR10
+from models import LeNet as LeNet_CIFAR10
 
 import torch.backends.cudnn as cudnn
 from criterion import CrossEntropyMMCE, CrossEntropySoftECE, CrossEntropyLabelSmooth, KLECE, FocalLoss
 
-from torch.autograd import Variable
 from model import NetworkCIFAR as Network
 from utils.evaluation import test_performance
 
@@ -80,17 +82,16 @@ config.hostname = socket.gethostname()
 config.name = "retrain"
 
 model_list = {
-    'alexnet': alexnet, 'vgg11': vgg11, 'vgg11_bn': vgg11_bn, 'vgg13': vgg13, 'vgg13_bn': vgg13_bn, 'vgg16': vgg16,
-    'vgg16_bn': vgg16_bn, 'vgg19': vgg19, 'vgg19_bn': vgg19_bn,
-    'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50, 'resnet50_pytorch': resnet50_pytorch, 'resnet101': resnet101, 'resnet152': resnet152,
-    'wide_resnet101_2': wide_resnet101_2,
-    'wide_resnet50_2': wide_resnet50_2, 'resnext50_32x4d': resnext50_32x4d,
-    'resnext101_32x8d': resnext101_32x8d, 'densenet121': densenet121, 'densenet161': densenet161,
-    'densenet169': densenet169, 'densenet201': densenet201, 'squeezenet1_0': squeezenet1_0,
-    'squeezenet1_1': squeezenet1_1, 'mnasnet0_5': mnasnet0_5, 'mnasnet0_75': mnasnet0_75,
-    'mnasnet1_0': mnasnet1_0, 'mnasnet1_3': mnasnet1_3, 'mobilenet_v2': mobilenet_v2,
-    'shufflenet_v2_x0_5': shufflenet_v2_x0_5, 'shufflenet_v2_x1_0': shufflenet_v2_x1_0,
-    'shufflenet_v2_x1_5': shufflenet_v2_x1_5, 'shufflenet_v2_x2_0': shufflenet_v2_x2_0, 'inception_v3': inception_v3
+    'ResNet18': ResNet18_CIFAR10, 'ResNet34': ResNet34_CIFAR10, 'ResNet50': ResNet50_CIFAR10,
+    'ResNet101': ResNet101_CIFAR10, 'ResNet152': ResNet152_CIFAR10,
+    'ShuffleNetV2': ShuffleNetV2_CIFAR10,
+    'MobileNet': MobileNet_CIFAR10, 'MobileNetV2': MobileNetV2_CIFAR10,
+    'EfficientNet': EfficientNet_CIFAR10,
+    'ResNeXt29_2x64d': ResNeXt29_2x64d_CIFAR10, 'ResNeXt29_4x64d': ResNeXt29_4x64d_CIFAR10,
+    'ResNeXt29_8x64d': ResNeXt29_8x64d_CIFAR10,
+    'ResNeXt29_32x4d': ResNeXt29_32x4d_CIFAR10,
+    'VGG11': VGG11_CIFAR10, 'VGG13': VGG13_CIFAR10, 'VGG16': VGG16_CIFAR10, 'VGG19': VGG19_CIFAR10,
+    'LeNet': LeNet_CIFAR10,
 }
 
 wandb.init(project="NAS Calibration", entity="linweitao", config=config)
@@ -109,14 +110,11 @@ def main():
     torch.cuda.manual_seed(args.seed)
     logging.info('gpu device = %d' % args.gpu)
     logging.info("args = %s", args)
-    if args.arch in ['alexnet', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn',
-                     'resnet18', 'resnet34', 'resnet50', 'resnet50_pytorch', 'resnet101', 'resnet152', 'wide_resnet101_2',
-                     'wide_resnet50_2', 'resnext50_32x4d', 'resnext101_32x8d', 'densenet121', 'densenet161',
-                     'densenet169', 'densenet201', 'squeezenet1_0', 'squeezenet1_1', 'mnasnet0_5', 'mnasnet0_75',
-                     'mnasnet1_0', 'mnasnet1_3', 'mobilenet_v2', 'shufflenet_v2_x0_5', 'shufflenet_v2_x1_0',
-                     'shufflenet_v2_x1_5', 'shufflenet_v2_x2_0', 'inception_v3']:
+    if args.arch in ['ResNet18', 'ResNet34', 'ResNet50', 'ResNet101', 'ResNet152', 'ShuffleNetV2',
+                     'MobileNet', 'MobileNetV2', 'EfficientNet', 'ResNeXt29_2x64d', 'ResNeXt29_4x64d',
+                     'ResNeXt29_8x64d', 'ResNeXt29_32x4d', 'VGG11', 'VGG13', 'VGG16', 'VGG19', 'LeNet']:
 
-        model = model_list[args.arch](num_classes=CIFAR_CLASSES)
+        model = model_list[args.arch]()
         args.is_searched_arch = False
         wandb.config.is_searched_arch = False
     else:
@@ -236,7 +234,7 @@ def infer(test_queue, model, criterion):
             input = input.cuda()
             target = target.cuda()
 
-            if args.auxiliary and args.is_searched_arch:
+            if args.is_searched_arch:
                 logits, logits_aux = model(input)
             else:
                 logits = model(input)
